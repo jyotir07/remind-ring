@@ -35,7 +35,9 @@ def run() -> int:
     cursor = now - timedelta(minutes=40)
     for i, (title, est) in enumerate(MILESTONES, start=1):
         db.add_milestone(goal_id, title, float(i), est, clock.iso(cursor))
-        cursor += timedelta(minutes=est + 90)
+        # Four simulated hours apart. At CLOCK_SCALE=60 that is four real minutes,
+        # so milestone 2 cannot ring in the middle of a three-minute demo.
+        cursor += timedelta(hours=4)
 
     db.add_blocker(user_id, None, PRIOR_BLOCKER[0], PRIOR_BLOCKER[1])
     return goal_id

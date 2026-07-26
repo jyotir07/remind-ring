@@ -46,19 +46,29 @@ def conn() -> sqlite3.Connection:
 
 
 def init() -> None:
-    with conn() as c:
+    c = conn()
+    try:
         c.executescript(SCHEMA)
+        c.commit()
+    finally:
+        c.close()
 
 
 def wipe() -> None:
+    """Windows will not unlink a file with an open handle, so every helper below
+    closes its connection explicitly. `with sqlite3.connect(...)` commits a
+    transaction; it does not close the connection."""
     if DB_PATH.exists():
         DB_PATH.unlink()
     init()
 
 
 def _rows(sql, args=()) -> list[dict]:
-    with conn() as c:
+    c = conn()
+    try:
         return [dict(r) for r in c.execute(sql, args).fetchall()]
+    finally:
+        c.close()
 
 
 def _row(sql, args=()) -> dict | None:
@@ -67,10 +77,13 @@ def _row(sql, args=()) -> dict | None:
 
 
 def _exec(sql, args=()) -> int:
-    with conn() as c:
+    c = conn()
+    try:
         cur = c.execute(sql, args)
         c.commit()
         return cur.lastrowid
+    finally:
+        c.close()
 
 
 # ---------- users / goals / milestones ----------
@@ -153,6 +166,10 @@ def close_checkin(cid, outcome) -> None:
     )
 
 
+def any_open_checkin() -> dict | None:
+    return _row("SELECT * FROM checkins WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1")
+
+
 def open_checkin_for(milestone_id) -> dict | None:
     return _row(
         "SELECT * FROM checkins WHERE milestone_id=? AND closed_at IS NULL"
@@ -170,6 +187,10 @@ def add_turn(checkin_id, role, text, audio_path=None, blocker=None,
         (checkin_id, idx, role, audio_path, text, blocker, confidence, strategy,
          clock.now_iso()),
     )
+
+
+def get_turn(tid) -> dict | None:
+    return _row("SELECT * FROM turns WHERE id=?", (tid,))
 
 
 def turns(checkin_id) -> list[dict]:

@@ -5,6 +5,7 @@ and prints the classification, the strategy, the reply and the board change.
 Use --text to pass an excuse as a string instead of audio.
 """
 import sys
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -28,6 +29,7 @@ def one(source: str, is_text: bool) -> dict:
     print(BAR)
     print(f"INPUT   {source}")
 
+    t0 = time.time()
     op = brain.opening(cid)
     print(f"AGENT   {op['text']}")
     if op["recalled"]:
@@ -44,6 +46,7 @@ def one(source: str, is_text: bool) -> dict:
     if out["board_change"]:
         print(f"BOARD   {out['board_change']}")
     print(f"STATE   {[(m['title'][:28], m['status']) for m in db.milestones_for_goal(goal_id)]}")
+    print(f"TIME    {time.time() - t0:.1f}s (text only, TTS is a separate request)")
     return out
 
 

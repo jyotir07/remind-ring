@@ -11,8 +11,10 @@ Three run modes:
 import base64
 import hashlib
 import json
+import logging
 import math
 import os
+import re
 import struct
 import subprocess
 import time
@@ -20,6 +22,8 @@ import wave
 from pathlib import Path
 
 import httpx
+
+log = logging.getLogger("sarvam")
 
 BASE = "https://api.sarvam.ai"
 ROOT = Path(__file__).parent
@@ -29,6 +33,20 @@ CACHE.mkdir(exist_ok=True)
 KEY = os.getenv("SARVAM_API_KEY", "").strip()
 OFFLINE = os.getenv("OFFLINE") == "1"
 MOCK = os.getenv("MOCK") == "1" or not KEY
+
+# sarvam-30b reasons by default and reasoning tokens count against max_tokens.
+# Measured 26 July on this app's real prompts: effort="low" still burned the whole
+# budget thinking (4.4K chars), returned finish_reason="length" and content=None,
+# and took 8-43s. Only an explicit JSON null switches thinking off. Omitting the
+# key is NOT the same thing -- the server default is "low".
+# With null: think=0, finish=stop, 0.7-1.8s. This is the single most important
+# line in the file.
+REASONING_EFFORT = None
+MAX_TOKENS = 700
+
+# Cuts the newline-padding degenerate path short instead of paying for 700 tokens
+# of whitespace. Well-formed JSON never contains a blank line.
+STOP = ["\n\n\n"]
 
 _client: httpx.Client | None = None
 
@@ -127,7 +145,8 @@ def stt(path: str | Path) -> str:
 
 # ---------------------------------------------------------------------- chat
 
-def chat(messages: list, schema: dict | None = None, kind: str = "turn") -> dict:
+def chat(messages: list, schema: dict | None = None, kind: str = "turn",
+         temperature: float = 0.3) -> dict:
     key = json.dumps([messages, kind], sort_keys=True, ensure_ascii=False)
     cache = _cache_path("chat", key)
 
@@ -140,37 +159,90 @@ def chat(messages: list, schema: dict | None = None, kind: str = "turn") -> dict
     if OFFLINE:
         raise RuntimeError("OFFLINE=1 and no cached completion for this turn")
 
-    body = {"model": "sarvam-30b", "messages": messages,
-            "temperature": 0.3, "max_tokens": 700}
+    body = {"model": "sarvam-30b", "messages": messages, "temperature": temperature,
+            "max_tokens": MAX_TOKENS, "reasoning_effort": REASONING_EFFORT,
+            "stop": STOP}
     if schema:
         body["response_format"] = {"type": "json_schema", "json_schema": schema}
 
     data = _post(f"{BASE}/v1/chat/completions", json=body)
-    raw = data["choices"][0]["message"]["content"]
+    choice = data["choices"][0]
+    raw = choice["message"]["content"]
+    if raw is None:
+        raise RuntimeError(
+            f"empty content (finish_reason={choice['finish_reason']}) — the model "
+            f"spent the token budget on reasoning. Check REASONING_EFFORT is None."
+        )
     out = _parse_json(raw, messages, schema)
     cache.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     return out
 
 
-def _parse_json(raw: str, messages: list, schema: dict | None) -> dict:
-    """json_schema mode should make this unnecessary. It is here because a
-    malformed turn mid-call is a dead demo, and one repair retry is cheap."""
-    txt = raw.strip()
+def _loads(txt: str) -> dict | None:
+    """json_schema mode is usually clean, but 'usually' is not a demo guarantee —
+    a malformed turn was observed live. Try progressively dirtier fixes."""
+    txt = txt.strip()
     if txt.startswith("```"):
         txt = txt.split("\n", 1)[-1].rsplit("```", 1)[0]
-    try:
-        return json.loads(txt)
-    except json.JSONDecodeError:
-        pass
+    candidates = [txt]
+
+    start, end = txt.find("{"), txt.rfind("}")
+    if start != -1 and end > start:
+        obj = txt[start:end + 1]
+        candidates.append(obj)
+        candidates.append(re.sub(r",(\s*[}\]])", r"\1", obj))   # trailing commas
+        candidates.append(re.sub(r"}\s*{", "},{", obj))          # missing separator
+
+    # Observed live: the model writes a complete object, then pads newlines until
+    # max_tokens and never closes the outer brace (finish_reason="length").
+    # The payload is intact -- only the closing braces are missing.
+    if start != -1:
+        body = txt[start:].rstrip()
+        depth, in_str, esc = 0, False, False
+        for ch in body:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = not in_str
+            elif not in_str:
+                depth += (ch == "{") - (ch == "}")
+        if depth > 0:
+            candidates.append(body + "}" * depth)
+
+    for c in candidates:
+        try:
+            out = json.loads(c)
+            if isinstance(out, dict):
+                return out
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def _parse_json(raw: str, messages: list, schema: dict | None) -> dict:
+    out = _loads(raw)
+    if out is not None:
+        return out
+
+    log.warning("unparseable completion, retrying once: %s", raw[:200])
     repair = messages + [
         {"role": "assistant", "content": raw},
-        {"role": "user", "content": "Return only the JSON object. No prose, no code fences."},
+        {"role": "user", "content": "That was not valid JSON. Return only the JSON "
+                                    "object, on one line, no prose, no code fences."},
     ]
-    body = {"model": "sarvam-30b", "messages": repair, "temperature": 0, "max_tokens": 700}
+    body = {"model": "sarvam-30b", "messages": repair, "temperature": 0,
+            "max_tokens": MAX_TOKENS, "reasoning_effort": REASONING_EFFORT,
+            "stop": STOP}
     if schema:
         body["response_format"] = {"type": "json_schema", "json_schema": schema}
     data = _post(f"{BASE}/v1/chat/completions", json=body)
-    return json.loads(data["choices"][0]["message"]["content"].strip().strip("`"))
+
+    out = _loads(data["choices"][0]["message"]["content"] or "")
+    if out is None:
+        raise ValueError("model returned unparseable JSON twice")
+    return out
 
 
 # ------------------------------------------------------------- text to speech
@@ -276,29 +348,28 @@ def _mock_chat(messages: list, kind: str) -> dict:
         }
 
     if kind == "opening":
-        prior = "prior_blockers: none" not in joined
-        if prior:
-            return {"reply_text": "[mock] Kal bhi tumne yahi bola tha. Aaj kya scene hai — start kiya ya nahi?"}
+        if "prior_blockers: none" not in joined:
+            return {"reply_text": "[mock] Kal bhi tumne yahi bola tha — aaj start kiya ya nahi?"}
         return {"reply_text": "[mock] Tumne bola tha aaj yeh khatam karoge. Start kiya?"}
 
-    said = joined.rsplit("they said:", 1)[-1].strip().strip('"')
-    blocker, conf = _mock_classify(said)
-    strategy = STRATEGY_FOR[blocker]
+    if kind == "classify":
+        blocker, conf = _mock_classify(joined)
+        return {"blocker": blocker, "confidence": conf}
 
-    n_turns = joined.count("user:")
+    strategy = joined.rsplit("your strategy:", 1)[-1].split("—")[0].strip()
+    if strategy not in _MOCK_REPLIES:
+        strategy = "shrink"
+
     commitment = None
     close = False
-    if blocker == "done_already":
-        commitment = {"text": "Confirm the completed section and start the next one", "size_min": 5}
+    if strategy == "verify":
+        commitment = {"text": "Confirm the finished section and start the next one", "size_min": 5}
         close = True
-    elif n_turns >= 1:
+    elif joined.count("user:") >= 1:
         commitment = {"text": "Write the introduction paragraph", "size_min": 3}
         close = True
 
     return {
-        "blocker": blocker,
-        "confidence": conf,
-        "strategy": strategy,
         "reply_text": "[mock] " + _MOCK_REPLIES[strategy],
         "commitment": commitment,
         "close": close,

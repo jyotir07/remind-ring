@@ -1,0 +1,6 @@
+INFO:     Started server process [24544]
+INFO:     Waiting for application startup.
+INFO app: mode=live  clock_scale=60.0  sim_now=2026-07-26T13:45:00
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:50631 - "GET /events HTTP/1.1" 200 OK
