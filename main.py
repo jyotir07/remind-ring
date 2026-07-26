@@ -71,6 +71,10 @@ async def scheduler() -> None:
 async def lifespan(app: FastAPI):
     db.init()
     clock.reset()
+    if not db.latest_goal(USER_ID):
+        import seed
+        seed.run()                        # never boot into an empty board
+        log.info("empty database, seeded demo state")
     log.info("mode=%s  clock_scale=%s  sim_now=%s",
              sarvam.mode(), clock.SCALE, clock.now_iso())
     if sarvam.mode() == "mock":
