@@ -1,8 +1,20 @@
-INFO app: empty database, seeded demo state
-INFO app: mode=live  clock_scale=60.0  sim_now=2026-07-26T13:45:44
-INFO app: RING milestone=Read the deadlocks section checkin=1 sim=2026-07-26T13:46:05
-INFO app: RING milestone=Read the deadlocks section checkin=1 sim=2026-07-26T13:45:21
+INFO app: mode=live  clock_scale=60.0  sim_now=2026-07-26T13:45:00
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/text-to-speech "HTTP/1.1 200 OK"
+INFO app: RING milestone=Read the deadlocks section checkin=1 sim=2026-07-26T13:45:29
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/text-to-speech "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/text-to-speech "HTTP/1.1 200 OK"
 INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
 INFO httpx: HTTP Request: POST https://api.sarvam.ai/text-to-speech "HTTP/1.1 200 OK"
 INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
 INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/text-to-speech "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/text-to-speech "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/v1/chat/completions "HTTP/1.1 200 OK"
+INFO httpx: HTTP Request: POST https://api.sarvam.ai/text-to-speech "HTTP/1.1 200 OK"

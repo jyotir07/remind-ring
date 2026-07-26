@@ -88,19 +88,27 @@ async function refresh() {
   pill.textContent = b.mode;
   pill.className = 'pill ' + b.mode;
 
-  $('goalTitle').textContent = b.goal ? b.goal.title : 'No goal yet';
+  $('goalTitle').textContent = b.goals.length ? 'Your plan' : 'No goal yet';
 
-  $('milestones').innerHTML = '';
-  for (const m of b.milestones) {
-    const el = document.createElement('div');
-    el.className = 'ms';
-    el.dataset.status = m.status;
-    el.innerHTML =
-      `<div class="ms-title">${m.title}</div>
-       <div class="ms-meta">${m.est_min} min<br><span class="ms-status">${m.status}</span></div>`;
-    if (lastStatuses[m.id] && lastStatuses[m.id] !== m.status) el.classList.add('flash');
-    lastStatuses[m.id] = m.status;
-    $('milestones').appendChild(el);
+  const wrap = $('milestones');
+  wrap.innerHTML = '';
+  for (const g of b.goals) {
+    const h = document.createElement('div');
+    h.className = 'goal-head';
+    h.textContent = g.title;
+    wrap.appendChild(h);
+
+    for (const m of g.milestones) {
+      const el = document.createElement('div');
+      el.className = 'ms';
+      el.dataset.status = m.status;
+      el.innerHTML =
+        `<div class="ms-title">${m.title}</div>
+         <div class="ms-meta">${m.est_min} min<br><span class="ms-status">${m.status}</span></div>`;
+      if (lastStatuses[m.id] && lastStatuses[m.id] !== m.status) el.classList.add('flash');
+      lastStatuses[m.id] = m.status;
+      wrap.appendChild(el);
+    }
   }
 
   $('ledger').innerHTML = b.ledger.length

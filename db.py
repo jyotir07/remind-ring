@@ -129,6 +129,10 @@ def milestones_for_goal(goal_id) -> list[dict]:
     )
 
 
+def goals(user_id) -> list[dict]:
+    return _rows("SELECT * FROM goals WHERE user_id=? ORDER BY id", (user_id,))
+
+
 def latest_goal(user_id) -> dict | None:
     return _row(
         "SELECT * FROM goals WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_id,)
