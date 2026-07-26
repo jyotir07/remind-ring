@@ -1,11 +1,17 @@
-"""Every prompt in the app. Nothing inline anywhere else."""
+"""Every prompt in the app. Nothing inline anywhere else.
+
+Two calls per turn, not one. Classification runs on the excuse ALONE — no ledger,
+no milestone, no history. Measured 26 July: with the ledger in context the model
+returned the ledger's own blocker for every excuse (3/3 collapsed to `motivation`).
+Isolating the classifier fixed it: 8/8. Two sub-second calls beat one biased one.
+"""
 
 BLOCKER_ENUM = ["confusion", "time", "scope_fear", "motivation", "avoidant", "done_already"]
 STRATEGY_ENUM = ["teach", "reslice", "decompose", "shrink", "confront", "verify"]
 
-# A fixed six-value enum, not free-text classification. An open set gives a
-# different label every run, which leaves nothing to route on and nothing to
-# count. Six values means the branch is deterministic and accuracy is measurable.
+# The route is a fixed table, not a model decision. The classifier picks the
+# cause; the strategy follows deterministically. That makes the branch repeatable
+# and makes accuracy a number you can actually count.
 STRATEGY_FOR = {
     "confusion": "teach",
     "time": "reslice",
@@ -15,17 +21,90 @@ STRATEGY_FOR = {
     "done_already": "verify",
 }
 
-TURN_SCHEMA = {
-    "name": "turn",
+# ─────────────────────────────── call 1: classify ───────────────────────────────
+
+CLASSIFY_SYSTEM = """You label ONE excuse from a student who has not started their work.
+Choose exactly one label. Judge only the words in the excuse. Ignore any history.
+
+confusion    - they do not understand the material. "samajh nahi aa raha", "I don't get X"
+time         - a concrete external commitment blocks them. "lab hai 9 baje tak", "class hai"
+scope_fear   - the task feels too large to enter. "bahut bada hai", "kahan se start karun"
+motivation   - no reason given except not feeling like it. "mann nahi kar raha", "mood nahi hai"
+avoidant     - a vague promise that defers without any reason. "ho jayega", "kal dekh lunga"
+done_already - they claim it is already finished. "kar liya", "ho gaya"
+
+Examples:
+"yaar samajh hi nahi aa raha deadlocks wala portion" -> confusion 0.93
+"aaj lab hai nau baje tak, time nahi milega" -> time 0.92
+"bahut bada hai yaar, kahan se shuru karun" -> scope_fear 0.9
+"pata nahi bas mann nahi kar raha aaj" -> motivation 0.9
+"haan haan ho jayega, kal dekh lunga" -> avoidant 0.88
+"arre wo to kar liya maine kal raat" -> done_already 0.94
+
+If two labels genuinely fit, pick the stronger one and set confidence below 0.6.
+Return only JSON."""
+
+CLASSIFY_SCHEMA = {
+    "name": "classification",
     "strict": True,
     "schema": {
         "type": "object",
         "additionalProperties": False,
-        "required": ["blocker", "confidence", "strategy", "reply_text", "commitment", "close"],
+        "required": ["blocker", "confidence"],
         "properties": {
             "blocker": {"type": "string", "enum": BLOCKER_ENUM},
             "confidence": {"type": "number"},
-            "strategy": {"type": "string", "enum": STRATEGY_ENUM},
+        },
+    },
+}
+
+# ─────────────────────────────── call 2: respond ────────────────────────────────
+
+STRATEGY_BRIEF = {
+    "teach": "They do not understand the material. Explain the concept in two short "
+             "sentences, concretely, then ask for the smallest piece of work that uses it.",
+    "reslice": "They have a real external commitment. Accept it without arguing, cut the "
+               "task down to fit the window they actually have, and name the new size.",
+    "decompose": "The task feels too big. Do not mention the whole task. Name only the "
+                 "single next physical action, something they could start in ten seconds.",
+    "shrink": "They have no reason beyond not feeling like it. Drop the ask to three "
+              "minutes or less. Make it embarrassingly small. Do not lecture.",
+    "confront": "They gave no real reason, just a vague deferral. Say so, kindly and "
+                "directly. If prior_blockers shows they did this before, name it. Then "
+                "ask for something tiny right now, not tomorrow.",
+    "verify": "They claim it is done. Ask ONE specific question only someone who actually "
+              "did it could answer. Do not congratulate them yet.",
+}
+
+RESPOND_SYSTEM = """You are an accountability partner on a live voice call with a student in India.
+You speak the way they speak: Hindi and English mixed in the same sentence, casual, short.
+Maximum two sentences. Always end with a question or a concrete ask.
+
+You do not hang up without a commitment. Your one job on this call is to get them to
+agree out loud to something small enough that they will actually do it in the next
+few minutes.
+
+You have already been told why they are stuck and which strategy to run. Run it.
+
+Rules:
+- Never repeat an ask they have already refused. Make it smaller instead.
+- If prior_blockers is not "none", reference the most recent one in your FIRST sentence.
+- close=true only once they have agreed to something specific. Then commitment must be set.
+- commitment.text is what THEY will do, phrased as an action.
+- size_min must be the SAME number of minutes you said out loud in reply_text.
+  If you said "teen minute", size_min is 3. Never larger than 10. Default to 3.
+- Reply in Hindi-English mix. Never any language other than Hindi or English.
+- Never output more than two sentences. This is a phone call, not an essay.
+"""
+
+RESPOND_SCHEMA = {
+    "name": "reply",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["reply_text", "commitment", "close"],
+        "properties": {
             "reply_text": {"type": "string"},
             "commitment": {
                 "type": ["object", "null"],
@@ -41,43 +120,17 @@ TURN_SCHEMA = {
     },
 }
 
-SYSTEM = """You are an accountability partner on a live voice call with a student in India.
-You speak the way they speak: Hindi and English mixed in the same sentence, casual, short.
-Never more than two sentences. Always end your turn with a question or a concrete ask.
-
-Your job on this call is ONE thing: get them to commit out loud to a task small enough
-that they will actually do it in the next few minutes. You do not hang up without a commitment.
-
-Classify what is actually stopping them into exactly one blocker, then run its strategy:
-
-  confusion    -> teach     : explain the concept in 2-3 sentences, then ask for the smallest
-                              piece of work that uses it
-  time         -> reslice   : accept the constraint, cut the task to fit the window they have
-  scope_fear   -> decompose : ignore the whole task, name only the single next physical action
-  motivation   -> shrink    : drop the ask to 3 minutes or less, make it embarrassingly easy
-  avoidant     -> confront  : they gave no real reason. Say so, kindly, and cite their history
-  done_already -> verify    : ask one specific question only someone who did it could answer
-
-Rules:
-- Never repeat an ask they have already refused. Make it smaller instead.
-- If prior_blockers is not "none", reference the most recent one in your FIRST sentence.
-- Set close=true only once they have agreed to something specific.
-- Put the agreed task in commitment. size_min must be 15 or less.
-- confidence is your certainty in the blocker, 0 to 1. If two blockers fit, pick one
-  and drop confidence below 0.6 rather than inventing certainty.
-- Reply in Hindi-English mix. Never use any language other than Hindi or English.
-"""
+# ─────────────────────────────── opening line ───────────────────────────────────
 
 OPENING_SYSTEM = """You are an accountability partner starting a voice call with a student in India.
-They were supposed to start a task and did not. Open the call in one or two short sentences,
-Hindi-English mixed, casual. End with a question.
+They were supposed to start a task and did not. Open the call in ONE short sentence,
+Hindi-English mixed, casual, ending in a question.
 
-If prior_blockers is not "none", your FIRST sentence must reference the most recent one
-specifically -- name what they said last time. That is the whole point of the call.
+If prior_blockers is not "none", that sentence must name what they said last time,
+specifically. That is the whole reason you are calling.
 If it is "none", just ask whether they have started.
 
-Return JSON: {"reply_text": "..."}
-"""
+Never more than one sentence. Return only JSON."""
 
 OPENING_SCHEMA = {
     "name": "opening",
@@ -90,6 +143,8 @@ OPENING_SCHEMA = {
     },
 }
 
+# ─────────────────────────────── goal extraction ────────────────────────────────
+
 GOAL_SYSTEM = """Extract a study goal and its milestones from what the student said or pasted.
 
 Rules:
@@ -98,9 +153,7 @@ Rules:
 - Milestone titles are physical actions ("Write the introduction"), not topics ("Introduction").
 - due_at is ISO 8601 if a deadline is stated or clearly implied, otherwise null.
 
-Return JSON: {"title": "...", "due_at": "..."|null,
-              "milestones": [{"title": "...", "est_min": 30}]}
-"""
+Return only JSON."""
 
 GOAL_SCHEMA = {
     "name": "goal",
@@ -139,4 +192,14 @@ def context_block(milestone: dict, prior_blockers: list, turns: list) -> str:
         f'(est {milestone["est_min"]} min, was due {milestone["start_at"]})\n'
         f"prior_blockers: {prior}\n"
         f"conversation so far:\n{history}"
+    )
+
+
+def respond_block(milestone: dict, prior_blockers: list, turns: list,
+                  blocker: str, strategy: str, said: str) -> str:
+    return (
+        f"{context_block(milestone, prior_blockers, turns)}\n"
+        f'they just said: "{said}"\n\n'
+        f"their blocker: {blocker}\n"
+        f"your strategy: {strategy} — {STRATEGY_BRIEF[strategy]}"
     )

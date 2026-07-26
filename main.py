@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 from fastapi import FastAPI, File, Form, UploadFile          # noqa: E402
-from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
+from fastapi.responses import FileResponse, Response, StreamingResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles                  # noqa: E402
 
 import brain      # noqa: E402
@@ -87,9 +87,12 @@ async def index():
     return FileResponse(ROOT / "static" / "index.html")
 
 
-@app.get("/audio/{name}")
-async def audio(name: str):
-    return FileResponse(AUDIO / Path(name).name, media_type="audio/wav")
+@app.get("/voice/{turn_id}")
+async def voice(turn_id: int):
+    path = await asyncio.to_thread(brain.voice, turn_id)
+    if not path:
+        return Response(status_code=204)
+    return FileResponse(path, media_type="audio/wav")
 
 
 @app.get("/events")

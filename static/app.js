@@ -35,9 +35,11 @@ function ringtone(on) {
   ringTimer = setInterval(beep, 2200);
 }
 
-function play(url) {
-  if (!url) return;
-  player.src = url;
+// Text lands first, voice follows on its own request. The audio arrives a few
+// seconds later and that is fine — nobody is waiting on a blank screen.
+function play(turnId) {
+  if (!turnId) return;
+  player.src = `/voice/${turnId}`;
   player.play().catch(() => {});
 }
 
@@ -139,7 +141,7 @@ $('answerBtn').onclick = async () => {
   const r = await (await fetch(`/answer/${checkinId}`, { method: 'POST' })).json();
   thinking(false);
   bubble('agent', r.text, { recalled: r.recalled });
-  play(r.audio_url);
+  play(r.turn_id);
 };
 
 $('declineBtn').onclick = () => { ringtone(false); endCall(); };
@@ -175,7 +177,7 @@ async function sendTurn(payload) {
     blocker: r.blocker, confidence: r.confidence,
     strategy: r.strategy, change: r.board_change,
   });
-  play(r.audio_url);
+  play(r.turn_id);
   refresh();
 
   if (r.close) setTimeout(() => { phone.dataset.state = 'idle'; checkinId = null; }, 4500);
