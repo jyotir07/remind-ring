@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reverse Reminder</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div id="arm" class="arm">
+  <div class="arm-box">
+    <h1>Reverse Reminder</h1>
+    <p>The accountability agent that doesn't remind you — it helps you finish.</p>
+    <button id="armBtn">Arm the demo</button>
+    <small>Unlocks audio playback. The call still fires on its own.</small>
+  </div>
+</div>
+
+<header>
+  <div class="brand">Reverse<span>Reminder</span></div>
+  <div class="meta">
+    <span class="pill" id="modePill">—</span>
+    <span class="clock">sim clock <b id="simNow">—</b></span>
+    <button id="resetBtn" class="ghost">Reset demo</button>
+  </div>
+</header>
+
+<main>
+  <!-- ─────────────── plan board ─────────────── -->
+  <section class="board">
+    <h2 id="goalTitle">No goal yet</h2>
+    <div id="milestones" class="milestones"></div>
+
+    <div class="split">
+      <div>
+        <h3>Ledger <small>why you stalled, remembered</small></h3>
+        <ul id="ledger" class="ledger"></ul>
+      </div>
+      <div>
+        <h3>Commitments <small>what you agreed to, out loud</small></h3>
+        <ul id="commitments" class="ledger"></ul>
+      </div>
+    </div>
+
+    <div class="intake">
+      <h3>Add a goal</h3>
+      <textarea id="goalText" rows="2"
+        placeholder="Paste an assignment brief, or say it out loud…"></textarea>
+      <div class="intake-row">
+        <button id="goalSend">Add goal</button>
+        <button id="goalMic" class="ghost">🎙 Hold to speak</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────────── phone ─────────────── -->
+  <section class="phone-wrap">
+    <div class="phone" id="phone" data-state="idle">
+
+      <div class="screen idle-screen">
+        <div class="idle-dot"></div>
+        <p>Waiting.</p>
+        <small>Nobody needs to click anything.</small>
+      </div>
+
+      <div class="screen ring-screen">
+        <div class="avatar">RR</div>
+        <p class="caller">Reverse Reminder</p>
+        <p class="reason" id="ringReason">—</p>
+        <div class="ring-actions">
+          <button id="answerBtn" class="answer">Answer</button>
+          <button id="declineBtn" class="decline">Decline</button>
+        </div>
+      </div>
+
+      <div class="screen call-screen">
+        <div class="call-head">
+          <span class="live">● live</span>
+          <span id="callTitle">—</span>
+          <button id="endBtn" class="ghost tiny">End</button>
+        </div>
+        <div id="transcript" class="transcript"></div>
+        <div class="call-foot">
+          <button id="talkBtn" class="talk">Hold to talk</button>
+          <input id="typeBox" placeholder="…or type your excuse" />
+          <div id="clipRow" class="clips"></div>
+        </div>
+      </div>
+
+    </div>
+    <audio id="player"></audio>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
