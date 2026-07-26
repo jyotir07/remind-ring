@@ -14,9 +14,12 @@ AUDIO.mkdir(exist_ok=True)
 
 GOAL = "DBMS assignment — deadlocks unit"
 MILESTONES = [
-    ("Read the deadlocks section", 25),
-    ("Write the introduction", 30),
-    ("Solve the numerical problems", 45),
+    ("Read the deadlocks section", 25,
+     "Chapter 7, pages 210-224. Focus on circular wait and the four Coffman conditions."),
+    ("Write the introduction", 30,
+     "One page defining deadlock in your own words, with one worked example."),
+    ("Solve the numerical problems", 45,
+     "Q1 to Q6 at the end of the chapter — the banker's algorithm ones."),
 ]
 
 # The excuse from "yesterday". Without it the first call has no history and the
@@ -42,8 +45,8 @@ def run() -> int:
     # First milestone starts in the PAST, so the ring is guaranteed on the next
     # tick. Never rely on live clock drift during a demo.
     cursor = now - timedelta(minutes=40)
-    for i, (title, est) in enumerate(MILESTONES, start=1):
-        db.add_milestone(goal_id, title, float(i), est, clock.iso(cursor))
+    for i, (title, est, note) in enumerate(MILESTONES, start=1):
+        db.add_milestone(goal_id, title, float(i), est, clock.iso(cursor), note=note)
         # Four simulated hours apart. At CLOCK_SCALE=60 that is four real minutes,
         # so milestone 2 cannot ring in the middle of a three-minute demo.
         cursor += timedelta(hours=4)

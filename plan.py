@@ -57,47 +57,60 @@ def extract(raw_text: str, user_id: int, source: str = "text") -> int:
     # enough to add a goal live and still have it ring inside a 3-minute demo.
     cursor = clock.now() + timedelta(minutes=25)
     for i, m in enumerate(out["milestones"], start=1):
-        db.add_milestone(goal_id, m["title"], float(i), int(m["est_min"]),
-                         clock.iso(cursor))
+        db.add_milestone(goal_id, _short(m["title"]), float(i), int(m["est_min"]),
+                         clock.iso(cursor), note=m.get("note"))
         cursor += timedelta(hours=4)
     return goal_id
 
 
 # ------------------------------------------------------------------- mutations
 
+def _short(s: str, words: int = 6, chars: int = 46) -> str:
+    """Card titles are labels, not sentences. Commitment text is a full spoken
+    sentence, and putting it straight on a card produced cards titled with an
+    entire paragraph."""
+    s = " ".join((s or "").split()).rstrip(".!?,;: ")
+    parts = s.split(" ")
+    if len(parts) > words:
+        s = " ".join(parts[:words])
+    return (s[:chars].rstrip() + "…") if len(s) > chars else s
+
+
 def apply(milestone: dict, strategy: str, commitment: dict | None) -> str:
     """Returns a human-readable description of what changed on the board."""
     mid = milestone["id"]
     size = int(commitment["size_min"]) if commitment else 3
     text = commitment["text"] if commitment else "Make a start"
+    label = _short(commitment.get("label") or text) if commitment else "Make a start"
     now = clock.now()
 
     if strategy == "teach":
-        db.add_milestone(milestone["goal_id"], f"{text}", milestone["order_idx"] - 0.5,
-                         size, clock.iso(now), status="active")
+        db.add_milestone(milestone["goal_id"], label, milestone["order_idx"] - 0.5,
+                         size, clock.iso(now), status="active", note=text)
         db.update_milestone(mid, status="pending")
         return f"Inserted a {size}-minute step before “{milestone['title']}”"
 
     if strategy == "reslice":
         slot = next_free_slot(now + timedelta(minutes=30), size)
-        db.update_milestone(mid, est_min=size, start_at=clock.iso(slot), status="pending")
+        db.update_milestone(mid, est_min=size, start_at=clock.iso(slot),
+                            status="pending", note=text)
         return f"Cut to {size} min and moved to {slot.strftime('%a %H:%M')}"
 
     if strategy == "decompose":
-        db.add_milestone(milestone["goal_id"], text, milestone["order_idx"] - 0.5,
-                         size, clock.iso(now), status="active")
+        db.add_milestone(milestone["goal_id"], label, milestone["order_idx"] - 0.5,
+                         size, clock.iso(now), status="active", note=text)
         db.update_milestone(mid, est_min=max(5, milestone["est_min"] - size),
                             status="pending")
-        return f"Split off “{text}” as the next action"
+        return f"Split off “{label}” as the next action"
 
     if strategy == "shrink":
-        db.add_milestone(milestone["goal_id"], text, milestone["order_idx"] - 0.5,
-                         min(size, 3), clock.iso(now), status="active")
+        db.add_milestone(milestone["goal_id"], label, milestone["order_idx"] - 0.5,
+                         min(size, 3), clock.iso(now), status="active", note=text)
         db.update_milestone(mid, status="pending")
         return f"Shrunk the ask to {min(size, 3)} minutes, starting now"
 
     if strategy == "confront":
-        db.update_milestone(mid, status="active",
+        db.update_milestone(mid, status="active", note=text,
                             start_at=clock.iso(now + timedelta(minutes=size)))
         return f"Held to it — due in {size} minutes, no reschedule"
 
