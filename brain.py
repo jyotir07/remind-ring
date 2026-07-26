@@ -1,4 +1,5 @@
 """THE MECHANIC — classify the blocker, route to a strategy, mutate the plan."""
+import hashlib
 import logging
 from pathlib import Path
 
@@ -15,11 +16,17 @@ AUDIO = Path(__file__).parent / "audio"
 def voice(turn_id: int) -> Path | None:
     """TTS is the slowest leg (~3.4s measured) and it is serial after the model.
     Generating it on a separate request lets the reply text and the blocker chip
-    land ~3.4s earlier; the audio catches up while the judge is already reading."""
+    land ~3.4s earlier; the audio catches up while the judge is already reading.
+
+    Named by a hash of the text, never by turn id: turn ids restart at 1 on every
+    reseed while the wav files persist, so id-named files served the *previous*
+    run's audio against the current run's text. A file can only ever contain what
+    its name says."""
     turn = db.get_turn(turn_id)
-    if not turn:
+    if not turn or not turn["text"]:
         return None
-    dest = AUDIO / f"turn{turn_id}.wav"
+    digest = hashlib.sha1(turn["text"].encode("utf-8")).hexdigest()[:16]
+    dest = AUDIO / f"{digest}.wav"
     if dest.exists():
         return dest
     try:

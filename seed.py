@@ -9,6 +9,9 @@ load_dotenv(Path(__file__).parent / ".env")
 import clock  # noqa: E402
 import db     # noqa: E402
 
+AUDIO = Path(__file__).parent / "audio"
+AUDIO.mkdir(exist_ok=True)
+
 GOAL = "DBMS assignment — deadlocks unit"
 MILESTONES = [
     ("Read the deadlocks section", 25),
@@ -24,6 +27,12 @@ PRIOR_BLOCKER = ("motivation", "kal bhi mann nahi kar raha tha, subah karunga bo
 def run() -> int:
     clock.reset()
     db.wipe()
+
+    # Generated wavs are disposable — cache/ still holds the Sarvam responses, so
+    # a replay costs a base64 decode, not an API call. Leaving them around is how
+    # stale audio survived a reseed in the first place.
+    for wav in AUDIO.glob("*.wav"):
+        wav.unlink(missing_ok=True)
 
     user_id = db.add_user("Jyotir")
     now = clock.now()

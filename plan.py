@@ -52,13 +52,14 @@ def extract(raw_text: str, user_id: int, source: str = "text") -> int:
 
     goal_id = db.add_goal(user_id, out["title"], source, raw_text, out.get("due_at"))
 
-    # First milestone lands two simulated hours out. At CLOCK_SCALE=900 that is
-    # about eight real seconds -- long enough that nobody thinks you clicked it.
-    cursor = clock.now() + timedelta(hours=2)
+    # First milestone lands 25 simulated minutes out. At CLOCK_SCALE=60 that is
+    # ~25 real seconds: long enough that nobody thinks you clicked it, short
+    # enough to add a goal live and still have it ring inside a 3-minute demo.
+    cursor = clock.now() + timedelta(minutes=25)
     for i, m in enumerate(out["milestones"], start=1):
         db.add_milestone(goal_id, m["title"], float(i), int(m["est_min"]),
                          clock.iso(cursor))
-        cursor += timedelta(minutes=int(m["est_min"]) + 45)
+        cursor += timedelta(hours=4)
     return goal_id
 
 

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -136,13 +137,15 @@ async def events():
 
 @app.get("/board")
 async def board():
-    goal = db.latest_goal(USER_ID)
-    milestones = db.milestones_for_goal(goal["id"]) if goal else []
+    # Every goal, not just the newest. The scheduler rings across all of them, so
+    # showing one meant an added goal could hide a live one that was still calling.
+    goals = db.goals(USER_ID)
+    for g in goals:
+        g["milestones"] = db.milestones_for_goal(g["id"])
     return {
         "mode": sarvam.mode(),
         "sim_now": clock.now_iso(),
-        "goal": goal,
-        "milestones": milestones,
+        "goals": goals,
         "ledger": db.all_blockers(USER_ID)[:8],
         "commitments": db.commitments(USER_ID)[:8],
         "clips": sorted(p.name for p in CLIPS.iterdir()
@@ -195,7 +198,12 @@ async def hangup(checkin_id: int):
     ck = db.get_checkin(checkin_id)
     if ck and not ck["closed_at"]:
         db.close_checkin(checkin_id, "abandoned")
-        db.set_status(ck["milestone_id"], "stalled")
+        # Declining does not make the work go away. Re-arm it ten simulated
+        # minutes out so it calls back — leaving it `stalled` would silently
+        # retire the milestone, which is the behaviour of the reminder apps
+        # this thing exists to replace.
+        db.update_milestone(ck["milestone_id"], status="active",
+                            start_at=clock.iso(clock.now() + timedelta(minutes=10)))
     await publish({"type": "board"})
     return {"ok": True}
 

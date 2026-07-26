@@ -49,6 +49,10 @@ main{display:grid; grid-template-columns:1fr 400px; gap:1.4rem; padding:1.4rem;
 .board{background:var(--panel); border:1px solid var(--line);
        border-radius:14px; padding:1.2rem}
 .milestones{display:flex; flex-direction:column; gap:.6rem; margin:1rem 0 1.4rem}
+.goal-head{font-size:12px; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--dim); margin-top:.6rem; padding-bottom:.2rem;
+  border-bottom:1px solid var(--line)}
+.goal-head:first-child{margin-top:0}
 .ms{display:flex; align-items:center; gap:.9rem; padding:.75rem .9rem;
     background:var(--panel2); border:1px solid var(--line);
     border-left:4px solid var(--pending); border-radius:10px;
