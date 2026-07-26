@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS goals (
     raw_input TEXT, due_at TEXT, created_at TEXT
 );
 CREATE TABLE IF NOT EXISTS milestones (
-    id INTEGER PRIMARY KEY, goal_id INTEGER, title TEXT, order_idx REAL,
+    id INTEGER PRIMARY KEY, goal_id INTEGER, title TEXT, note TEXT, order_idx REAL,
     est_min INTEGER, start_at TEXT, status TEXT DEFAULT 'pending',
     completed_at TEXT
 );
@@ -49,6 +49,9 @@ def init() -> None:
     c = conn()
     try:
         c.executescript(SCHEMA)
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(milestones)")}
+        if "note" not in cols:                 # older db from before notes existed
+            c.execute("ALTER TABLE milestones ADD COLUMN note TEXT")
         c.commit()
     finally:
         c.close()
@@ -100,11 +103,12 @@ def add_goal(user_id, title, source, raw_input, due_at) -> int:
     )
 
 
-def add_milestone(goal_id, title, order_idx, est_min, start_at, status="pending") -> int:
+def add_milestone(goal_id, title, order_idx, est_min, start_at, status="pending",
+                  note=None) -> int:
     return _exec(
-        "INSERT INTO milestones (goal_id, title, order_idx, est_min, start_at, status)"
-        " VALUES (?,?,?,?,?,?)",
-        (goal_id, title, order_idx, est_min, start_at, status),
+        "INSERT INTO milestones (goal_id, title, note, order_idx, est_min, start_at,"
+        " status) VALUES (?,?,?,?,?,?,?)",
+        (goal_id, title, note, order_idx, est_min, start_at, status),
     )
 
 

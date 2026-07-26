@@ -53,17 +53,28 @@ main{display:grid; grid-template-columns:1fr 400px; gap:1.4rem; padding:1.4rem;
   color:var(--dim); margin-top:.6rem; padding-bottom:.2rem;
   border-bottom:1px solid var(--line)}
 .goal-head:first-child{margin-top:0}
-.ms{display:flex; align-items:center; gap:.9rem; padding:.75rem .9rem;
-    background:var(--panel2); border:1px solid var(--line);
+.ms{background:var(--panel2); border:1px solid var(--line);
     border-left:4px solid var(--pending); border-radius:10px;
     transition:border-color .4s, background .4s}
+.ms-row{display:flex; align-items:center; gap:.7rem; padding:.75rem .9rem;
+    cursor:pointer; user-select:none}
+.ms-row:hover{background:#ffffff08; border-radius:8px}
+.caret{color:var(--dim); font-size:11px; transition:transform .18s; display:inline-block}
+.ms.open .caret{transform:rotate(90deg)}
+.ms-body{display:none; padding:0 .9rem .8rem 2.2rem; border-top:1px dashed var(--line);
+    margin:0 .9rem; padding-top:.7rem}
+.ms.open .ms-body{display:block}
+.ms-note{margin:0 0 .4rem; font-size:13px; color:var(--dim); line-height:1.5}
+.ms-due{margin:0; font-size:12px; color:var(--active); font-variant-numeric:tabular-nums}
+.ms[data-status=stalled] .ms-due{color:var(--stalled)}
+.ms[data-status=done] .ms-due{color:var(--done)}
 .ms[data-status=active]{border-left-color:var(--active)}
 .ms[data-status=stalled]{border-left-color:var(--stalled); background:#241d10}
 .ms[data-status=done]{border-left-color:var(--done); opacity:.62}
 .ms[data-status=done] .ms-title{text-decoration:line-through}
 .ms.flash{animation:flash .9s ease}
 @keyframes flash{0%{background:#2b2350}100%{}}
-.ms-title{flex:1; font-weight:500}
+.ms-title{flex:1; font-weight:500; min-width:0; overflow-wrap:anywhere}
 .ms-meta{font-size:12px; color:var(--dim); text-align:right; white-space:nowrap}
 .ms-status{font-size:11px; text-transform:uppercase; letter-spacing:.06em;
            color:var(--dim)}

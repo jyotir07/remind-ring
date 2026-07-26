@@ -6,6 +6,22 @@ let checkinId = null;
 let audioCtx = null;
 let ringTimer = null;
 let lastStatuses = {};
+const openCards = new Set();   // survives the re-render on every board update
+
+const esc = (s) =>
+  String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Milestone times are on the simulated clock, so show them the way a planner
+// would — "today 5:44 PM" — never a raw ISO string.
+function when(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  const t = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  return sameDay ? `today ${t}` : `${days[d.getDay()]} ${t}`;
+}
 
 /* ── audio ─────────────────────────────────────────────────────────────── */
 // Browsers block audio until a gesture. Arming once up front means the ring —
@@ -102,9 +118,25 @@ async function refresh() {
       const el = document.createElement('div');
       el.className = 'ms';
       el.dataset.status = m.status;
+      if (openCards.has(m.id)) el.classList.add('open');
+
+      const due = m.status === 'done' ? 'completed' : `due ${when(m.start_at)}`;
       el.innerHTML =
-        `<div class="ms-title">${m.title}</div>
-         <div class="ms-meta">${m.est_min} min<br><span class="ms-status">${m.status}</span></div>`;
+        `<div class="ms-row">
+           <span class="caret">▸</span>
+           <div class="ms-title">${esc(m.title)}</div>
+           <div class="ms-meta">${m.est_min} min<br><span class="ms-status">${m.status}</span></div>
+         </div>
+         <div class="ms-body">
+           <p class="ms-note">${esc(m.note || 'No description.')}</p>
+           <p class="ms-due">${due}</p>
+         </div>`;
+
+      el.querySelector('.ms-row').onclick = () => {
+        el.classList.toggle('open');
+        openCards.has(m.id) ? openCards.delete(m.id) : openCards.add(m.id);
+      };
+
       if (lastStatuses[m.id] && lastStatuses[m.id] !== m.status) el.classList.add('flash');
       lastStatuses[m.id] = m.status;
       wrap.appendChild(el);

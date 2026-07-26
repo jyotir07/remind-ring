@@ -90,9 +90,16 @@ Rules:
 - Never repeat an ask they have already refused. Make it smaller instead.
 - If prior_blockers is not "none", reference the most recent one in your FIRST sentence.
 - close=true only once they have agreed to something specific. Then commitment must be set.
-- commitment.text is what THEY will do, phrased as an action.
+- commitment.text is what THEY will do, phrased as an action, one sentence.
+- commitment.label is the same thing in AT MOST 5 words, English, title case off.
+  Example: text "Bas ek paragraph likh do intro ka" -> label "Write intro paragraph".
 - size_min must be the SAME number of minutes you said out loud in reply_text.
   If you said "teen minute", size_min is 3. Never larger than 10. Default to 3.
+
+Output ONLY the JSON object. Never repeat, quote, or summarise the information you
+were given above — no milestone lines, no prior_blockers, no timestamps, no
+"conversation so far". reply_text is speech: it is read aloud to the student exactly
+as written, so it must contain nothing but what a person would say on a phone call.
 - Reply in Hindi-English mix — Hindi words in Roman script, English words as they are.
   Not pure English. Not pure Hindi. This is how they actually speak.
 - Never output more than two sentences. This is a phone call, not an essay.
@@ -103,27 +110,33 @@ Rules:
 FALLBACK_REPLY = {
     "teach": {"reply_text": "Chalo teen minute isko saath dekhte hain — pehle ek line "
                             "batao, tumhe kaunsa part atak raha hai?",
-              "commitment": {"text": "Name the exact part that is confusing", "size_min": 3},
+              "commitment": {"label": "Name the stuck part",
+                             "text": "Name the exact part that is confusing", "size_min": 3},
               "close": False},
     "reslice": {"reply_text": "Theek hai, aaj time nahi hai. Poora nahi — sirf paanch "
                               "minute ka pehla hissa, baad mein kar loge?",
-                "commitment": {"text": "Do the first five-minute slice later today", "size_min": 5},
+                "commitment": {"label": "First five-minute slice",
+                               "text": "Do the first five-minute slice later today", "size_min": 5},
                 "close": True},
     "decompose": {"reply_text": "Poora mat socho. Sirf file kholo aur heading likh do — "
                                 "bas itna, abhi kar sakte ho?",
-                  "commitment": {"text": "Open the file and write the heading", "size_min": 3},
+                  "commitment": {"label": "Open file, write heading",
+                                 "text": "Open the file and write the heading", "size_min": 3},
                   "close": True},
     "shrink": {"reply_text": "Mann nahi kar raha, theek hai. Sirf teen minute — ek "
                              "paragraph. Itna de sakte ho?",
-               "commitment": {"text": "Write one paragraph, three minutes", "size_min": 3},
+               "commitment": {"label": "Write one paragraph",
+                              "text": "Write one paragraph, three minutes", "size_min": 3},
                "close": True},
     "confront": {"reply_text": "Yeh tum pehle bhi bol chuke ho. Kal nahi — abhi paanch "
                                "minute, ek line likho. Haan ya na?",
-                 "commitment": {"text": "Write one line right now", "size_min": 5},
+                 "commitment": {"label": "Write one line now",
+                                "text": "Write one line right now", "size_min": 5},
                  "close": True},
     "verify": {"reply_text": "Achha! Ek cheez batao — usme aakhri point kya likha tha "
                              "tumne? Phir done mark kar deta hoon.",
-               "commitment": {"text": "Confirm the last point written", "size_min": 3},
+               "commitment": {"label": "Confirm last point",
+                              "text": "Confirm the last point written", "size_min": 3},
                "close": True},
 }
 
@@ -139,8 +152,11 @@ RESPOND_SCHEMA = {
             "commitment": {
                 "type": ["object", "null"],
                 "additionalProperties": False,
-                "required": ["text", "size_min"],
+                "required": ["label", "text", "size_min"],
                 "properties": {
+                    # label becomes the card title on the board, so it has to be
+                    # short. text is the full sentence, shown when the card opens.
+                    "label": {"type": "string"},
                     "text": {"type": "string"},
                     "size_min": {"type": "integer"},
                 },
@@ -167,7 +183,12 @@ Examples of the right voice:
   "Kal bhi tumne bola tha mann nahi kar raha — aaj deadlocks wala section start kiya?"
   "Tumne kaha tha subah karoge, ab tak intro likha ya nahi?"
 
-Never more than one sentence. Return only JSON."""
+Never more than one sentence.
+
+Output ONLY the JSON object. Never repeat, quote, or summarise the information you
+were given — no milestone lines, no prior_blockers, no timestamps, no "conversation
+so far". reply_text is read aloud exactly as written, so it must contain nothing but
+what a person would say on a phone call."""
 
 OPENING_SCHEMA = {
     "name": "opening",
@@ -187,7 +208,9 @@ GOAL_SYSTEM = """Extract a study goal and its milestones from what the student s
 Rules:
 - 2 to 4 milestones, in the order they must be done.
 - est_min is realistic minutes for a student, between 15 and 90.
-- Milestone titles are physical actions ("Write the introduction"), not topics ("Introduction").
+- Milestone titles are physical actions ("Write the introduction"), not topics
+  ("Introduction"), and AT MOST 6 words. They are cards on a board, not sentences.
+- note is one short sentence saying what the milestone actually involves.
 - due_at is ISO 8601 if a deadline is stated or clearly implied, otherwise null.
 
 Return only JSON."""
@@ -207,9 +230,10 @@ GOAL_SCHEMA = {
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": ["title", "est_min"],
+                    "required": ["title", "note", "est_min"],
                     "properties": {
                         "title": {"type": "string"},
+                        "note": {"type": "string"},
                         "est_min": {"type": "integer"},
                     },
                 },
