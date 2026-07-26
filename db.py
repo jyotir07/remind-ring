@@ -166,6 +166,10 @@ def close_checkin(cid, outcome) -> None:
     )
 
 
+def any_open_checkin() -> dict | None:
+    return _row("SELECT * FROM checkins WHERE closed_at IS NULL ORDER BY id DESC LIMIT 1")
+
+
 def open_checkin_for(milestone_id) -> dict | None:
     return _row(
         "SELECT * FROM checkins WHERE milestone_id=? AND closed_at IS NULL"

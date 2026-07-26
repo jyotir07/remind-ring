@@ -49,16 +49,19 @@ async def scheduler() -> None:
     seconds is fast enough to feel live and slow enough not to be a busy loop."""
     while True:
         try:
-            for ms in db.due_milestones(clock.now_iso()):
-                if db.open_checkin_for(ms["id"]):
-                    continue
-                db.set_status(ms["id"], "stalled")
-                cid = db.open_checkin(ms["user_id"], ms["id"], "missed start")
-                log.info("RING milestone=%s checkin=%s sim=%s",
-                         ms["title"], cid, clock.now_iso())
-                await publish({"type": "ring", "checkin_id": cid,
-                               "title": ms["title"], "est_min": ms["est_min"]})
-                break                     # one call at a time
+            # One call at a time, globally. The simulated clock runs fast enough
+            # that later milestones fall due mid-conversation; ringing again while
+            # the user is still on the phone is not accountability, it is a bug.
+            if not db.any_open_checkin():
+                due = db.due_milestones(clock.now_iso())
+                if due:
+                    ms = due[0]
+                    db.set_status(ms["id"], "stalled")
+                    cid = db.open_checkin(ms["user_id"], ms["id"], "missed start")
+                    log.info("RING milestone=%s checkin=%s sim=%s",
+                             ms["title"], cid, clock.now_iso())
+                    await publish({"type": "ring", "checkin_id": cid,
+                                   "title": ms["title"], "est_min": ms["est_min"]})
         except Exception as e:
             log.exception("scheduler tick failed: %s", e)
         await asyncio.sleep(TICK_SECONDS)
@@ -103,6 +106,16 @@ async def events():
     async def stream():
         try:
             yield f"data: {json.dumps({'type': 'hello', 'mode': sarvam.mode()})}\n\n"
+            # The scheduler may have rung before this browser connected (it fires
+            # on the first tick after startup). Replay the pending call so a page
+            # load never lands on a silent phone with a checkin already open.
+            pending = db.any_open_checkin()
+            if pending:
+                ms = db.get_milestone(pending["milestone_id"])
+                yield ("data: " + json.dumps({
+                    "type": "ring", "checkin_id": pending["id"],
+                    "title": ms["title"], "est_min": ms["est_min"],
+                    "replayed": True}) + "\n\n")
             while True:
                 try:
                     ev = await asyncio.wait_for(q.get(), timeout=15)

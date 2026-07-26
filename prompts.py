@@ -93,9 +93,39 @@ Rules:
 - commitment.text is what THEY will do, phrased as an action.
 - size_min must be the SAME number of minutes you said out loud in reply_text.
   If you said "teen minute", size_min is 3. Never larger than 10. Default to 3.
-- Reply in Hindi-English mix. Never any language other than Hindi or English.
+- Reply in Hindi-English mix — Hindi words in Roman script, English words as they are.
+  Not pure English. Not pure Hindi. This is how they actually speak.
 - Never output more than two sentences. This is a phone call, not an essay.
 """
+
+# Used only when the respond call fails outright. The classification has already
+# happened by then, so the route stays visible and the call survives.
+FALLBACK_REPLY = {
+    "teach": {"reply_text": "Chalo teen minute isko saath dekhte hain — pehle ek line "
+                            "batao, tumhe kaunsa part atak raha hai?",
+              "commitment": {"text": "Name the exact part that is confusing", "size_min": 3},
+              "close": False},
+    "reslice": {"reply_text": "Theek hai, aaj time nahi hai. Poora nahi — sirf paanch "
+                              "minute ka pehla hissa, baad mein kar loge?",
+                "commitment": {"text": "Do the first five-minute slice later today", "size_min": 5},
+                "close": True},
+    "decompose": {"reply_text": "Poora mat socho. Sirf file kholo aur heading likh do — "
+                                "bas itna, abhi kar sakte ho?",
+                  "commitment": {"text": "Open the file and write the heading", "size_min": 3},
+                  "close": True},
+    "shrink": {"reply_text": "Mann nahi kar raha, theek hai. Sirf teen minute — ek "
+                             "paragraph. Itna de sakte ho?",
+               "commitment": {"text": "Write one paragraph, three minutes", "size_min": 3},
+               "close": True},
+    "confront": {"reply_text": "Yeh tum pehle bhi bol chuke ho. Kal nahi — abhi paanch "
+                               "minute, ek line likho. Haan ya na?",
+                 "commitment": {"text": "Write one line right now", "size_min": 5},
+                 "close": True},
+    "verify": {"reply_text": "Achha! Ek cheez batao — usme aakhri point kya likha tha "
+                             "tumne? Phir done mark kar deta hoon.",
+               "commitment": {"text": "Confirm the last point written", "size_min": 3},
+               "close": True},
+}
 
 RESPOND_SCHEMA = {
     "name": "reply",
@@ -129,6 +159,13 @@ Hindi-English mixed, casual, ending in a question.
 If prior_blockers is not "none", that sentence must name what they said last time,
 specifically. That is the whole reason you are calling.
 If it is "none", just ask whether they have started.
+
+Write in Hindi-English mix — Hindi in Roman script, English words as they are.
+Not pure English.
+
+Examples of the right voice:
+  "Kal bhi tumne bola tha mann nahi kar raha — aaj deadlocks wala section start kiya?"
+  "Tumne kaha tha subah karoge, ab tak intro likha ya nahi?"
 
 Never more than one sentence. Return only JSON."""
 

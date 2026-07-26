@@ -82,13 +82,20 @@ def handle_turn(checkin_id: int, audio_path: str | Path = None,
     confidence = float(cls.get("confidence") or 0.5)
 
     # Call 2 — respond. Full context, but the branch is already decided.
-    out = sarvam.chat(
-        [{"role": "system", "content": prompts.RESPOND_SYSTEM},
-         {"role": "user", "content": prompts.respond_block(
-             ms, prior, history, blocker, strategy, said)}],
-        schema=prompts.RESPOND_SCHEMA,
-        kind="respond",
-    )
+    try:
+        out = sarvam.chat(
+            [{"role": "system", "content": prompts.RESPOND_SYSTEM},
+             {"role": "user", "content": prompts.respond_block(
+                 ms, prior, history, blocker, strategy, said)}],
+            schema=prompts.RESPOND_SCHEMA,
+            kind="respond",
+        )
+    except Exception as e:
+        # The classification already happened, so the route is known. Falling back
+        # to a canned line for THIS strategy keeps the branch visible and the call
+        # alive; only the wording is lost.
+        log.warning("respond call failed (%s), using %s fallback", e, strategy)
+        out = dict(prompts.FALLBACK_REPLY[strategy])
 
     reply = out.get("reply_text") or "Ek chhota sa step batao jo abhi kar sakte ho?"
 
