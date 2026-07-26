@@ -228,6 +228,7 @@ async function sendTurn(payload) {
 }
 
 $('typeBox').addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey) return;   // Ctrl+Enter belongs to Add goal
   if (e.key === 'Enter' && e.target.value.trim()) {
     sendTurn({ text: e.target.value.trim() });
     e.target.value = '';
