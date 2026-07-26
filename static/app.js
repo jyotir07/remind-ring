@@ -173,7 +173,8 @@ new EventSource('/events').onmessage = (e) => {
   if (ev.type === 'board') refresh();
 };
 
-$('answerBtn').onclick = async () => {
+async function answerCall() {
+  if (phone.dataset.state !== 'ringing') return;
   ringtone(false);
   phone.dataset.state = 'incall';
   $('transcript').innerHTML = '';
@@ -182,17 +183,20 @@ $('answerBtn').onclick = async () => {
   thinking(false);
   bubble('agent', r.text, { recalled: r.recalled });
   play(r.turn_id);
-};
-
-$('declineBtn').onclick = () => { ringtone(false); endCall(); };
-$('endBtn').onclick = endCall;
+}
 
 async function endCall() {
+  ringtone(false);
+  if (phone.dataset.state === 'idle') return;
   if (checkinId) await fetch(`/hangup/${checkinId}`, { method: 'POST' });
   checkinId = null;
   phone.dataset.state = 'idle';
   refresh();
 }
+
+$('answerBtn').onclick = answerCall;
+$('declineBtn').onclick = endCall;
+$('endBtn').onclick = endCall;
 
 async function sendTurn(payload) {
   if (!checkinId) return;
@@ -224,6 +228,7 @@ async function sendTurn(payload) {
 }
 
 $('typeBox').addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey) return;   // Ctrl+Enter belongs to Add goal
   if (e.key === 'Enter' && e.target.value.trim()) {
     sendTurn({ text: e.target.value.trim() });
     e.target.value = '';
@@ -276,9 +281,9 @@ recorder($('goalMic'), async (blob) => {
 });
 
 /* ── goal intake + reset ───────────────────────────────────────────────── */
-$('goalSend').onclick = async () => {
+async function addGoal() {
   const text = $('goalText').value.trim();
-  if (!text) return;
+  if (!text || $('goalSend').disabled) return;
   const fd = new FormData();
   fd.append('text', text);
   $('goalSend').disabled = true;
@@ -286,7 +291,9 @@ $('goalSend').onclick = async () => {
   $('goalSend').disabled = false;
   $('goalText').value = '';
   refresh();
-};
+}
+
+$('goalSend').onclick = addGoal;
 
 $('resetBtn').onclick = async () => {
   ringtone(false);
@@ -297,6 +304,29 @@ $('resetBtn').onclick = async () => {
   await fetch('/reset', { method: 'POST' });
   refresh();
 };
+
+/* ── shortcuts ─────────────────────────────────────────────────────────── */
+// Reaching for the mouse mid-demo is the one thing that makes a live call look
+// staged. Keyed off e.code so they survive a non-US layout.
+const isTyping = (el) =>
+  !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+
+document.addEventListener('keydown', (e) => {
+  if (e.repeat) return;
+
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    addGoal();
+    return;
+  }
+
+  // Shift+, and Shift+. type "<" and ">", so they must stay inert while the
+  // goal box or the excuse box has focus.
+  if (isTyping(e.target) || !e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+
+  if (e.code === 'Comma' || e.key === '<') { e.preventDefault(); answerCall(); }
+  if (e.code === 'Period' || e.key === '>') { e.preventDefault(); endCall(); }
+});
 
 $('armBtn').onclick = arm;
 refresh();

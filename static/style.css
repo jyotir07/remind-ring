@@ -18,6 +18,10 @@ button{
 button:disabled{opacity:.4; cursor:not-allowed}
 button.ghost{background:transparent; border:1px solid var(--line); color:var(--dim)}
 button.tiny{padding:.25rem .6rem; font-size:12px}
+kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px;
+  padding:.1rem .32rem; margin-left:.35rem; border-radius:4px; opacity:.62;
+  background:#ffffff1a; border:1px solid #ffffff26; color:inherit;
+  vertical-align:middle}
 
 /* arm overlay */
 .arm{position:fixed; inset:0; background:#0d1014f2; z-index:50;
